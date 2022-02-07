@@ -13,8 +13,42 @@ namespace X4HE.Database.Faker
 
             foreach(var postCount in Enumerable.Range(1, POST_COUNT))
             {
-                Console.WriteLine($"Creating Post {postCount}.");
+                Console.WriteLine($"{postCount} : {POST_COUNT}.");
                 GeneratePost();
+            }
+
+            using(var context = new X4HEContext())
+            {
+                Console.WriteLine();
+                Console.WriteLine("--------------------------------------------------");
+                Console.WriteLine("ENTITIES CREATED:");
+                Console.WriteLine();
+
+                Console.WriteLine($"Post: {context.Posts.Count()}");
+                Console.WriteLine($"PostComment: {context.PostComments.Count()}");
+                Console.WriteLine($"PostFeedContent: {context.PostFeedContents.Count()}");
+                Console.WriteLine($"PostReaction: {context.PostReactions.Count()}");
+                Console.WriteLine($"PostTopic: {context.PostTopics.Count()}");
+                Console.WriteLine();
+
+                Console.WriteLine($"Comment: {context.Comments.Count()}");
+                Console.WriteLine($"CommentReaction: {context.CommentReactions.Count()}");
+                Console.WriteLine($"CommentFeedContent: {context.CommentFeedContents.Count()}");
+                Console.WriteLine();
+
+                Console.WriteLine($"Reactions: {context.Reactions.Count()}");
+                Console.WriteLine($"ReactionNameMap: {context.ReactionNameMaps.Count()}");
+                Console.WriteLine($"ReactionNameLookup: {context.ReactionNameLookups.Count()}");
+                Console.WriteLine();
+
+                Console.WriteLine($"Topics: {context.Topics.Count()}");
+                Console.WriteLine($"TopicNameMap: {context.TopicNameMaps.Count()}");
+                Console.WriteLine($"TopicNameLookup: {context.TopicNameLookups.Count()}");
+                Console.WriteLine();
+
+                Console.WriteLine($"FeedContents: {context.FeedContents.Count()}");
+                Console.WriteLine($"FeedContentText: {context.FeedContentTexts.Count()}");
+                Console.WriteLine();
             }
         }
 
@@ -36,7 +70,7 @@ namespace X4HE.Database.Faker
 
             foreach(var count in Enumerable.Range(1, RandomNumber.Next(MINIMUM_TOPICS, MAXIMUM_TOPICS)))
             {
-                var topicId = GenerateTopic();
+                var topicId = GenerateTopic(postId);
                 CreatePostTopic(postId, topicId);
             }
 
@@ -78,12 +112,40 @@ namespace X4HE.Database.Faker
             return reactionId;
         }
 
-        public static int GenerateTopic()
+        public static int GenerateTopic(int postId)
         {
             var topicId = CreateTopic();
-            CreateTopicNameMap(topicId, RandomNumber.Next(1, TOPIC_NAMES.Length));
+
+            // start at 1
+            var topicNameLookupIds = GetTopicNameLookupIdsForPost(postId);
+
+            // start at 0
+            var unusedTopicNameLookupIds = Enumerable.Range(0, TOPIC_NAMES.Length).Except(topicNameLookupIds.Select(id => id - 1)).ToArray();
+
+            // adjusting between 0-start and 1-start in RandomNumber call
+            var pickedTopicIndex = RandomNumber.Next(0, unusedTopicNameLookupIds.Count() - 1);
+            unusedTopicNameLookupIds = unusedTopicNameLookupIds.Select(id => id + 1).ToArray();
+
+            CreateTopicNameMap(topicId, unusedTopicNameLookupIds[pickedTopicIndex]);
 
             return topicId;
+        }
+
+        private static int[] GetTopicNameLookupIdsForPost(int postId)
+        {
+            var topicNameLookupIds = new List<int>();
+            using(var context = new X4HEContext())
+            {
+                var postTopics = context.PostTopics
+                    .Where(pt => pt.PostId == postId);
+                var topicNameMaps = context.TopicNameMaps.ToList();
+                foreach(var postTopic in postTopics)
+                {
+                    topicNameLookupIds.Add(topicNameMaps.Where(tnm => tnm.TopicId == postTopic.TopicId).First().TopicNameLookupId);
+                }
+            }
+
+            return topicNameLookupIds.ToArray();
         }
 
         public static void CreateFeedContentText(int contentId)
@@ -316,25 +378,29 @@ namespace X4HE.Database.Faker
         {
             "Admissions",
             "Athletics",
-            "Academics"
+            "Academics",
+            "Student Life",
+            "Student Aid"
         };
 
         private static string[] REACTION_NAMES = new string[]
         {
             "Like",
             "Heart",
-            "Wow"
+            "Wow",
+            "Bazinga",
+            "Mid"
         };
 
-        private static int POST_COUNT = 1000;
+        private static int POST_COUNT = 100000;
 
-        private static int MINIMUM_COMMENTS = 1;
+        private static int MINIMUM_COMMENTS = 0;
         private static int MAXIMUM_COMMENTS = 3;
 
-        private static int MINIMUM_TOPICS = 1;
-        private static int MAXIMUM_TOPICS = 2;
+        private static int MINIMUM_TOPICS = 0;
+        private static int MAXIMUM_TOPICS = 5;
 
-        private static int MINIMUM_REACTIONS = 1;
-        private static int MAXIMUM_REACTIONS = 10;
+        private static int MINIMUM_REACTIONS = 0;
+        private static int MAXIMUM_REACTIONS = 6;
     }
 }
